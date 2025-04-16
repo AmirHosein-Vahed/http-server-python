@@ -14,24 +14,42 @@ and more.
 **Note**: If you're viewing this repo on GitHub, head over to
 [codecrafters.io](https://codecrafters.io) to try the challenge.
 
-# Passing the first stage
-
-The entry point for your HTTP server implementation is in `app/main.py`. Study
-and uncomment the relevant code, and push your changes to pass the first stage:
+## How To Use
 
 ```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
+git clone https://github.com/AmirHosein-Vahed/http-server-python.git
+cd http-server-python
+./your_program.sh
 ```
 
-Time to move on to the next stage!
 
-# Stage 2 & beyond
+## Features
 
-Note: This section is for stages 2 and beyond.
+- HTTP/1.1 protocol support
+- Concurrent client handling
+- Basic request parsing and routing
+- Static file serving capabilities
+- Request method handling (GET, POST, PUT, DELETE)
 
-1. Ensure you have `python (3.13)` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `app/main.py`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+## Requirements
+
+- Python 3.7 or higher
+- No external dependencies required
+
+
+## Development
+
+To start developing:
+
+1. Make sure you have Python 3.7+ installed
+2. Fork and clone this repository
+3. Start making changes to `app/main.py`
+
+
+## Contributing
+
+Feel free to open issues and pull requests for any improvements you'd like to make.
+
+## License
+
+This project is released under the MIT License.
