@@ -1,4 +1,4 @@
-from .HTTP_Server import HTTP_Server
+from HTTP_Server import HTTP_Server
 
 def main():
 
