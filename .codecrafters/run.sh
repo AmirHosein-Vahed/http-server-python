@@ -8,4 +8,7 @@
 
 set -e # Exit on failure
 
-exec pipenv run python3 -m app.main "$@"
+# exec pipenv run python3 -m app.main "$@"
+cd app
+# pwd
+python3 main.py
