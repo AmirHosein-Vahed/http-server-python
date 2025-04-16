@@ -1,14 +1,11 @@
 from HTTP_Server import HTTP_Server
-
-
-def handle_thread():
-    pass
+import sys
 
 def main():
 
-    server = HTTP_Server()
+    server = HTTP_Server(sys.argv)
     server.start()
-
+    
     while True:
         server.listen()
         
