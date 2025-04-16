@@ -26,6 +26,13 @@ class HTTP_Server:
         elif self.req.URLpath == "/index.html":
             self.resp.set_status(200)
         
+        elif self.req.URLpath == "/user-agent":
+            self.resp.set_status(200)
+            # self.req.print_data()
+            self.resp.add_header({"Content-Type": "text/plain"})
+            self.resp.add_header({"Content-Length": len(self.req.user_agent)})
+            self.resp.set_body(self.req.user_agent)
+        
         elif self.req.URLpath.startswith("/echo/"):
             arg = self.req.URLpath.split("/")[2]
             self.resp.set_status(200)
