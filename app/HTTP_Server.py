@@ -50,12 +50,10 @@ class HTTP_Server:
 
         elif self.req.URLpath.startswith("/files/"):
             file_name = self.req.URLpath.split("/")[2]
-            file_path = "." + os.path.join(self.static_dir, file_name)
+            file_path = os.path.join(self.static_dir, file_name)
 
             if not os.path.isfile(file_path):
                 self.resp.set_status(404)
-                print(f"file {file_path} not exists")
-                # self.resp.set_body(f"file {self.static_dir}/{file_name} not exists")
 
             else:
                 with open(file_path) as file:
