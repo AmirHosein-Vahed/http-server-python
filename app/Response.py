@@ -20,10 +20,10 @@ class Response:
             raise Exception("Satus did not set")
         
         elif self.status == 200:
-            response = f"HTTP/1.1 200 OK\r\n\r\n{self.headers}{self.body}"
+            response = f"HTTP/1.1 200 OK\r\n\r\n{self.headers}{self.body}\r\n\r\n"
         
         elif self.status == 404:
-            response = f"HTTP/1.1 404 Not Found\r\n\r\n{self.headers}{self.body}"
+            response = f"HTTP/1.1 404 Not Found\r\n\r\n{self.headers}{self.body}\r\n\r\n"
             
         self.__send(connection, response)
 
