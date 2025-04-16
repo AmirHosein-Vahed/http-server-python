@@ -1,6 +1,6 @@
 import socket
-from Request import Request
-from Response import Response
+from .Request import Request
+from .Response import Response
 
 class HTTP_Server:
     def __init__(self):
