@@ -1,6 +1,7 @@
 import socket
 from Request import Request
 from Response import Response
+import threading
 
 class HTTP_Server:
     def __init__(self):
@@ -14,7 +15,12 @@ class HTTP_Server:
     def listen(self):
 
         conn, addr = self.server_socket.accept()
-        self.req = Request(conn, addr)
+        threading.Thread(target=self.handle_request, args=(conn, addr,)).start()
+        # self.req = Request(conn, addr)
+        # self.route()
+
+    def handle_request(self, connection, address):
+        self.req = Request(connection, address)
         self.route()
 
     def route(self):
@@ -45,3 +51,4 @@ class HTTP_Server:
             self.resp.set_status(404)
 
         self.resp.send(self.req.connection)
+

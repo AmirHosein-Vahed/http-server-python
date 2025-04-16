@@ -1,5 +1,9 @@
 from HTTP_Server import HTTP_Server
 
+
+def handle_thread():
+    pass
+
 def main():
 
     server = HTTP_Server()
