@@ -1,18 +1,29 @@
 import socket  # noqa: F401
 
 
-def main():
-    # You can use print statements as follows for debugging, they'll be visible when running tests.
-    print("Logs from your program will appear here!")
+def path_matched(path: str) -> bool:
+    if path in ["/", "/index.html"]:
+        return True
+    else:
+        return False
 
-    # Uncomment this to pass the first stage
+
+def main():
 
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
+    print("Server listening at 127.0.0.1:4221")
 
     while True:
-        conn, addr = server_socket.accept() # wait for client
-        print(f"Request from {addr}")
-        conn.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+        conn, addr = server_socket.accept() # wait for client connection
+
+        data = conn.recv(1024).decode()
+        URLpath = data.split("\r\n")[0].split(" ")[1]
+
+        response = b"HTTP/1.1 200 OK\r\n\r\n"
+        if not path_matched(URLpath):
+            response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+
+        conn.sendall(response)
         conn.close()
             
     
