@@ -21,16 +21,12 @@ class View:
     # "/files/..."
     def get_file(req: Request, res: Response):
         file_name = req.URLpath.split("/")[2]
-        # print("File name ==", file_name)
-        # print("Static dir ==", res.static_dir)
-        # print("Is file? ==", os.path.isfile(os.path.join(res.static_dir, file_name)))
 
         if res.static_dir is None or not os.path.isfile(os.path.join(res.static_dir, file_name)):
             res.set_status(404)
 
         else:
             file_path = os.path.join(res.static_dir, file_name)
-            # print("File path ::", file_path)
             with open(file_path) as file:
                 content = file.read()
 
@@ -51,6 +47,23 @@ class View:
             with open(os.path.join(res.static_dir, file_name), 'w') as file:
                 file.write(req.body)
             res.set_status(201)
+
+    
+    def serve(req: Request, res: Response):
+        file_name = req.URLpath.split("/")[2]
+
+        if res.static_dir is None or not os.path.isfile(os.path.join(res.static_dir, file_name)):
+            res.set_status(404)
+
+        else:
+            file_path = os.path.join(res.static_dir, file_name)
+            with open(file_path) as file:
+                content = file.read()
+
+            res.set_status(200)
+            res.add_header({"Content-Type": "text/html"})
+            res.add_header({"Content-Length": os.path.getsize(file_path)})
+            res.set_body(content)
 
     # "/echo/..."
     def echo(req: Request, res: Response):

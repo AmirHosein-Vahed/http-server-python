@@ -14,6 +14,9 @@ class HTTP_Server:
         server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
         self.server_socket = server_socket
         print("Server listening at 127.0.0.1:4221")
+        
+        while True:
+            self.listen()
 
     def listen(self):
         conn, addr = self.server_socket.accept()

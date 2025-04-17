@@ -6,8 +6,8 @@ def main():
     server = HTTP_Server(sys.argv)
     server.start()
     
-    while True:
-        server.listen()
+    # while True:
+    #     server.listen()
         
 
 if __name__ == "__main__":

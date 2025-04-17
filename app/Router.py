@@ -6,4 +6,5 @@ router_map = [
     ("GET",  "^/files/"   , View.get_file),
     ("POST", "^/files/"   , View.post_file),
     ("GET",  "^/echo/"    , View.echo),
+    ("GET",  "^/serve/"   , View.serve),
 ]
