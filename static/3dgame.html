@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D First Person Game</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        .info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: monospace;
+            font-size: 16px;
+        }
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 20px;
+            pointer-events: none;
+        }
+        .score {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            font-family: monospace;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">Use WASD to move, Mouse to look around, Click to shoot</div>
+    <div class="crosshair">+</div>
+    <div class="score">Kills: <span id="killCount">0</span></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Sky and environment
+        const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
+        const skyTexture = new THREE.TextureLoader().load('https://threejs.org/examples/textures/2294472375_24a3b8ef46_o.jpg');
+        const skyMaterial = new THREE.MeshBasicMaterial({ map: skyTexture, side: THREE.BackSide });
+        const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+        scene.add(sky);
+
+        // Create mountain with more natural shape
+        function createMountain(x, z) {
+            const group = new THREE.Group();
+            
+            // Main mountain body with more segments for detail
+            const mountainGeometry = new THREE.ConeGeometry(10, 15, 16);
+            const vertices = mountainGeometry.attributes.position.array;
+            
+            // Add noise to vertices for more natural look
+            for(let i = 0; i < vertices.length; i += 3) {
+                const noise = Math.random() * 2 - 1;
+                vertices[i] += noise;
+                vertices[i + 2] += noise;
+            }
+            
+            const mountainMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x4b5320,
+                flatShading: true 
+            });
+            const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+            
+            // Snow cap with noise
+            const snowGeometry = new THREE.ConeGeometry(7, 5, 16);
+            const snowVertices = snowGeometry.attributes.position.array;
+            for(let i = 0; i < snowVertices.length; i += 3) {
+                const noise = Math.random() * 1.5 - 0.75;
+                snowVertices[i] += noise;
+                snowVertices[i + 2] += noise;
+            }
+            
+            const snowMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xFFFFFF,
+                flatShading: true 
+            });
+            const snow = new THREE.Mesh(snowGeometry, snowMaterial);
+            snow.position.y = 7;
+            
+            group.add(mountain, snow);
+            group.position.set(x, 7.5, z);
+            scene.add(group);
+        }
+
+        // Create tree
+        function createTree(x, z) {
+            const group = new THREE.Group();
+            
+            // Trunk
+            const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.2, 2, 8);
+            const trunkMaterial = new THREE.MeshPhongMaterial({ color: 0x4d2926 });
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            
+            // Leaves
+            const leavesGeometry = new THREE.ConeGeometry(1, 2, 8);
+            const leavesMaterial = new THREE.MeshPhongMaterial({ color: 0x1d4d1d });
+            const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+            leaves.position.y = 2;
+            
+            group.add(trunk);
+            group.add(leaves);
+            group.position.set(x, 1, z);
+            scene.add(group);
+        }
+
+        // Add environment objects
+        createMountain(-30, -30);
+        createMountain(30, -40);
+        createMountain(-20, -50);
+
+        for(let i = 0; i < 20; i++) {
+            const x = Math.random() * 40 - 20;
+            const z = Math.random() * 40 - 20;
+            if(Math.abs(x) > 5 || Math.abs(z) > 5) { // Keep area around player clear
+                createTree(x, z);
+            }
+        }
+
+        // Lighting
+        const light = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(light);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(0, 1, 0);
+        scene.add(directionalLight);
+
+        // Floor with texture
+        const textureLoader = new THREE.TextureLoader();
+        const floorTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/grasslight-big.jpg');
+        floorTexture.repeat.set(25, 25);
+        floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping;
+        const floorMaterial = new THREE.MeshStandardMaterial({ 
+            map: floorTexture,
+            roughness: 0.8,
+        });
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = 0;
+        scene.add(floor);
+
+        // Weapon setup
+        const raycaster = new THREE.Raycaster();
+        let killCount = 0;
+
+        // Create detailed person model
+        function createDetailedPerson(x, z) {
+            const group = new THREE.Group();
+            
+            // Body
+            const torsoGeometry = new THREE.CylinderGeometry(0.2, 0.15, 0.6, 8);
+            const limbMaterial = new THREE.MeshPhongMaterial({ color: 0x2E4053 });
+            const torso = new THREE.Mesh(torsoGeometry, limbMaterial);
+            
+            // Head
+            const headGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+            const skinMaterial = new THREE.MeshPhongMaterial({ color: 0xE5B59C });
+            const head = new THREE.Mesh(headGeometry, skinMaterial);
+            head.position.y = 0.4;
+            
+            // Arms
+            const armGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.4, 8);
+            const leftArm = new THREE.Mesh(armGeometry, limbMaterial);
+            const rightArm = new THREE.Mesh(armGeometry, limbMaterial);
+            leftArm.position.set(-0.25, 0.2, 0);
+            rightArm.position.set(0.25, 0.2, 0);
+            leftArm.rotation.z = -0.5;
+            rightArm.rotation.z = 0.5;
+            
+            // Legs
+            const legGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.4, 8);
+            const leftLeg = new THREE.Mesh(legGeometry, limbMaterial);
+            const rightLeg = new THREE.Mesh(legGeometry, limbMaterial);
+            leftLeg.position.set(-0.1, -0.4, 0);
+            rightLeg.position.set(0.1, -0.4, 0);
+            
+            group.add(torso, head, leftArm, rightArm, leftLeg, rightLeg);
+            group.position.set(x, 1, z);
+            group.isAlive = true;
+            group.userData = {
+                moveTime: Math.random() * Math.PI * 2,
+                speed: 0.02,  // Reduced speed
+                direction: new THREE.Vector3(),
+                targetPosition: new THREE.Vector3(x, 1, z),
+                nextUpdateTime: 0,
+                updateInterval: 3000  // Change direction every 3 seconds
+            };
+            scene.add(group);
+            return group;
+        }
+
+        // Enhanced M4 model with better proportions
+        function createWeapon() {
+            const weapon = new THREE.Group();
+            const metalMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x2C3E50,
+                roughness: 0.7,
+                metalness: 0.8
+            });
+            const blackMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x111111,
+                roughness: 0.9
+            });
+            
+            // Main body (receiver)
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(0.08, 0.15, 0.8),
+                metalMaterial
+            );
+            
+            // Enhanced handguard with rails
+            const handguard = new THREE.Group();
+            const mainGuard = new THREE.Mesh(
+                new THREE.BoxGeometry(0.1, 0.1, 0.5),
+                blackMaterial
+            );
+            const topRail = new THREE.Mesh(
+                new THREE.BoxGeometry(0.05, 0.02, 0.45),
+                metalMaterial
+            );
+            topRail.position.y = 0.06;
+            handguard.add(mainGuard, topRail);
+            handguard.position.z = 0.35;
+            
+            // Enhanced stock
+            const stock = new THREE.Group();
+            const stockBase = new THREE.Mesh(
+                new THREE.BoxGeometry(0.06, 0.12, 0.4),
+                blackMaterial
+            );
+            const stockPad = new THREE.Mesh(
+                new THREE.BoxGeometry(0.08, 0.15, 0.04),
+                blackMaterial
+            );
+            stockPad.position.z = -0.22;
+            stock.add(stockBase, stockPad);
+            stock.position.z = -0.4;
+            
+            // Enhanced barrel
+            const barrel = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.015, 0.018, 0.7, 12),
+                metalMaterial
+            );
+            barrel.rotation.x = Math.PI / 2;
+            barrel.position.z = 0.7;
+            
+            // Add muzzle brake
+            const muzzle = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.02, 0.025, 0.08, 12),
+                metalMaterial
+            );
+            muzzle.rotation.x = Math.PI / 2;
+            muzzle.position.z = 1;
+            
+            weapon.add(body, handguard, stock, barrel, muzzle);
+            weapon.position.set(0.35, -0.2, -0.5);
+            weapon.rotation.y = Math.PI / 30;
+            return weapon;
+        }
+
+        // Add weapon to camera
+        const weapon = createWeapon();
+        camera.add(weapon);
+        scene.add(camera);
+
+        // Generate more people randomly
+        const persons = [];
+        for(let i = 0; i < 15; i++) {
+            const x = Math.random() * 40 - 20;
+            const z = Math.random() * 40 - 20;
+            if(Math.abs(x) > 5 || Math.abs(z) > 5) { // Keep area around player clear
+                persons.push(createDetailedPerson(x, z));
+            }
+        }
+
+        // Sound effects setup
+        const audioLoader = new THREE.AudioLoader();
+        const listener = new THREE.AudioListener();
+        camera.add(listener);
+
+        const shootSound = new THREE.Audio(listener);
+        const deathSound = new THREE.Audio(listener);
+        
+        audioLoader.load('https://cdn.freesound.org/previews/442/442958_5674468-lq.mp3', (buffer) => {
+            shootSound.setBuffer(buffer);
+            shootSound.setVolume(0.5);
+        });
+        
+        audioLoader.load('https://cdn.freesound.org/previews/528/528957_12295155-lq.mp3', (buffer) => {
+            deathSound.setBuffer(buffer);
+            deathSound.setVolume(0.5);
+        });
+
+        // Blood particle system
+        function createBloodEffect(position) {
+            const particleCount = 30;
+            const geometry = new THREE.BufferGeometry();
+            const positions = [];
+            const velocities = [];
+            
+            for(let i = 0; i < particleCount; i++) {
+                positions.push(
+                    position.x + Math.random() * 0.2 - 0.1,
+                    position.y + Math.random() * 0.2,
+                    position.z + Math.random() * 0.2 - 0.1
+                );
+                velocities.push(
+                    Math.random() * 0.2 - 0.1,
+                    Math.random() * 0.2,
+                    Math.random() * 0.2 - 0.1
+                );
+            }
+            
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            
+            const material = new THREE.PointsMaterial({
+                color: 0x8B0000,
+                size: 0.05,
+                transparent: true
+            });
+            
+            const particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+            
+            return { particles, velocities };
+        }
+
+        // Camera and controls setup
+        camera.position.y = 1.6; // Average human height
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+
+        // Mouse look controls
+        let pitch = 0;
+        let yaw = 0;
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === document.body) {
+                yaw -= e.movementX * 0.002;
+                pitch -= e.movementY * 0.002;
+                pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+                camera.rotation.set(pitch, yaw, 0, 'YXZ');
+            }
+        });
+
+        // Click to start
+        renderer.domElement.addEventListener('click', () => {
+            document.body.requestPointerLock();
+        });
+
+        // Movement controls
+        document.addEventListener('keydown', (e) => {
+            switch(e.key.toLowerCase()) {
+                case 'w': moveForward = true; break;
+                case 's': moveBackward = true; break;
+                case 'a': moveLeft = true; break;
+                case 'd': moveRight = true; break;
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            switch(e.key.toLowerCase()) {
+                case 'w': moveForward = false; break;
+                case 's': moveBackward = false; break;
+                case 'a': moveLeft = false; break;
+                case 'd': moveRight = false; break;
+            }
+        });
+
+        // Update shooting mechanics
+        document.addEventListener('click', () => {
+            if (document.pointerLockElement === document.body) {
+                // Enhanced shooting sound with echo
+                if(shootSound.isPlaying) shootSound.stop();
+                shootSound.setPlaybackRate(1.2);
+                shootSound.play();
+                setTimeout(() => {
+                    const echo = shootSound.clone();
+                    echo.setVolume(0.2);
+                    echo.setPlaybackRate(0.8);
+                    echo.play();
+                }, 100);
+
+                // Enhanced recoil animation
+                weapon.position.z += 0.15;
+                weapon.rotation.x -= 0.1;
+                setTimeout(() => {
+                    weapon.position.z -= 0.15;
+                    weapon.rotation.x += 0.1;
+                }, 50);
+                
+                raycaster.setFromCamera(new THREE.Vector2(), camera);
+                const intersects = raycaster.intersectObjects(scene.children, true);
+                
+                if (intersects.length > 0) {
+                    const hitObject = intersects[0].object.parent;
+                    if (hitObject && hitObject.isAlive) {
+                        killPerson(hitObject);
+                    }
+                }
+            }
+        });
+
+        function killPerson(person) {
+            if (person.isAlive) {
+                person.isAlive = false;
+                killCount++;
+                document.getElementById('killCount').textContent = killCount;
+                
+                deathSound.play();
+                const bloodEffect = createBloodEffect(person.position);
+                
+                // Death animation with blood
+                const fallAnimation = {
+                    rotationX: 0,
+                    positionY: person.position.y,
+                    time: 0
+                };
+
+                const animate = () => {
+                    fallAnimation.rotationX += 0.1;
+                    fallAnimation.positionY = Math.max(0, fallAnimation.positionY - 0.1);
+                    fallAnimation.time += 1;
+                    
+                    // Update blood particles
+                    const positions = bloodEffect.particles.geometry.attributes.position.array;
+                    for(let i = 0; i < positions.length; i += 3) {
+                        positions[i] += bloodEffect.velocities[i];
+                        positions[i+1] += bloodEffect.velocities[i+1] - 0.01; // gravity
+                        positions[i+2] += bloodEffect.velocities[i+2];
+                    }
+                    bloodEffect.particles.geometry.attributes.position.needsUpdate = true;
+                    
+                    if(fallAnimation.time > 100) {
+                        scene.remove(bloodEffect.particles);
+                    }
+                    
+                    person.rotation.x = fallAnimation.rotationX;
+                    person.position.y = fallAnimation.positionY;
+
+                    if (fallAnimation.positionY > 0) {
+                        requestAnimationFrame(animate);
+                    }
+                };
+
+                animate();
+            }
+        }
+
+        // Enhanced person movement with running animation
+        function updatePersonAnimation(person) {
+            const now = Date.now();
+            const data = person.userData;
+            
+            // Update movement direction periodically
+            if (now > data.nextUpdateTime) {
+                const angle = Math.random() * Math.PI * 2;
+                data.direction.set(
+                    Math.cos(angle),
+                    0,
+                    Math.sin(angle)
+                );
+                data.nextUpdateTime = now + data.updateInterval;
+                
+                // Set new target position
+                data.targetPosition.set(
+                    person.position.x + data.direction.x * 10,
+                    1,
+                    person.position.z + data.direction.z * 10
+                );
+                
+                // Keep target within bounds
+                const bound = 18;
+                data.targetPosition.x = Math.max(-bound, Math.min(bound, data.targetPosition.x));
+                data.targetPosition.z = Math.max(-bound, Math.min(bound, data.targetPosition.z));
+            }
+            
+            // Smooth movement towards target
+            person.position.x += data.direction.x * data.speed;
+            person.position.z += data.direction.z * data.speed;
+            
+            // Smooth rotation towards movement direction
+            const targetAngle = Math.atan2(data.direction.x, data.direction.z);
+            let currentAngle = person.rotation.y;
+            
+            // Normalize angle difference
+            let angleDiff = targetAngle - currentAngle;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            
+            // Smooth rotation
+            person.rotation.y += angleDiff * 0.05;
+            
+            // Smoother animation for legs and arms
+            data.moveTime += data.speed * 2;
+            
+            // Smoother leg swing animation
+            const leftLeg = person.children[4];
+            const rightLeg = person.children[5];
+            leftLeg.rotation.x = Math.sin(data.moveTime) * 0.3;  // Reduced swing amplitude
+            rightLeg.rotation.x = Math.sin(data.moveTime + Math.PI) * 0.3;
+            
+            // Smoother arm swing animation
+            const leftArm = person.children[2];
+            const rightArm = person.children[3];
+            leftArm.rotation.x = Math.sin(data.moveTime + Math.PI) * 0.2;  // Reduced swing amplitude
+            rightArm.rotation.x = Math.sin(data.moveTime) * 0.2;
+            
+            // Add slight body tilt in movement direction
+            const torso = person.children[0];
+            torso.rotation.z = Math.sin(data.moveTime * 2) * 0.05;  // Subtle body sway
+        }
+
+        // Game loop
+        const speed = 0.1;
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Update person animations
+            persons.forEach(person => {
+                if(person.isAlive) {
+                    updatePersonAnimation(person);
+                }
+            });
+
+            if (document.pointerLockElement === document.body) {
+                if (moveForward) {
+                    camera.position.x -= Math.sin(yaw) * speed;
+                    camera.position.z -= Math.cos(yaw) * speed;
+                }
+                if (moveBackward) {
+                    camera.position.x += Math.sin(yaw) * speed;
+                    camera.position.z += Math.cos(yaw) * speed;
+                }
+                if (moveLeft) {
+                    camera.position.x -= Math.cos(yaw) * speed;
+                    camera.position.z += Math.sin(yaw) * speed;
+                }
+                if (moveRight) {
+                    camera.position.x += Math.cos(yaw) * speed;
+                    camera.position.z -= Math.sin(yaw) * speed;
+                }
+
+                // Add subtle weapon movement
+                if (moveForward || moveBackward || moveLeft || moveRight) {
+                    const time = Date.now() * 0.002;
+                    camera.position.y = 1.6 + Math.sin(time * 4) * 0.05;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
